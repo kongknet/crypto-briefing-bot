@@ -1,30 +1,27 @@
-name: Crypto Daily Briefing
+name: Crypto Auto Briefing
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 1 * * *' # 北京时间每天 09:00
   workflow_dispatch: 
 
 jobs:
-  send_report:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Briefing
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }}
-          # 删掉了 format: markdown，直接发纯文本最稳
-          message: |
-            今日加密货币行业简报 (2026-01-31)
-            --------------------------
-            今日必看空投 (Airdrop):
-            1. Monad: 融资 2.25 亿美金，主网激励活动权重最高。
-            2. Berachain: 2 月初将有代币动态，建议保持测试网交互。
-            3. Movement: 关注 L3 扩展计划的最新积分任务。
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-            市场分析:
-            - BTC 在 105,000 美元震荡，资金向高性能 L1 流动。
-            - 建议关注链上 Gas 较低时段进行交互。
-            --------------------------
-            自动化简报由 GitHub Actions 驱动
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run Scraper and Send
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
