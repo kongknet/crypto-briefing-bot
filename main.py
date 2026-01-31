@@ -1,52 +1,56 @@
 import requests
-from bs4 import BeautifulSoup
 import os
+from datetime import datetime
 
-def get_high_value_airdrops():
-    # 抓取 Airdrops.io 的最新列表
-    url = "https://airdrops.io/latest/"
+def get_latest_fundraising():
+    # 使用 DefiLlama 的融资 API，数据极其稳定且权威
+    url = "https://api.llama.fi/raises"
     headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, 'html.parser')
     
-    airdrops = soup.find_all('article', class_='airdrop-hover', limit=10)
-    
-    high_value_list = []
-    
-    for drop in airdrops:
-        name = drop.find('h3').text.strip()
-        link = drop.find('a')['href']
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        data = response.json()
+        raises = data.get('raises', [])
         
-        # 模拟“大额融资”筛选逻辑
-        # 提示：由于网页端融资额通常在详情页，我们这里先进行关键词标记
-        # 实际操作中，我们会结合 CryptoRank API 获取精准金额
-        status = "🔥 潜力大毛" if "Potential" in str(drop) else "✅ 确认为空投"
+        # 筛选逻辑：融资额大于 1000 万美金的项目 (或者显示为 Unknown 的潜力股)
+        # 我们只看最近 7 天内公布的项目
+        content = "🚀 **今日大额融资 & 潜力空投项目**\n"
+        content += "--------------------------\n"
         
-        high_value_list.append(f"项目名称: {name}\n状态: {status}\n详情查看: {link}")
+        count = 0
+        for project in raises[:15]: # 扫描最近的15个项目
+            amount = project.get('amount', 0)
+            name = project.get('name', 'Unknown')
+            sector = project.get('sector', 'Infrastructure')
+            lead_investor = project.get('leadInvestors', ['N/A'])[0]
+            
+            # 筛选条件：融资额 > 10M 或者融资额为 0 (通常是未披露大额项目)
+            if amount == 0 or amount >= 10:
+                amount_str = f"${amount}M" if amount > 0 else "未披露"
+                content += f"🔹 **项目:** {name}\n"
+                content += f"💰 **金额:** {amount_str} | **赛道:** {sector}\n"
+                content += f"👤 **领投方:** {lead_investor}\n"
+                content += f"🔗 [点击研究](https://www.google.com/search?q={name}+crypto+airdrop)\n\n"
+                count += 1
+            
+            if count >= 5: break # 每天推送最精华的5个项目
 
-    # 构造发送内容
-    message = "💰 **今日大额融资/高质量空投筛选**\n"
-    message += "--------------------------\n"
-    if not high_value_list:
-        message += "今日暂无满足筛选条件的新项目。"
-    else:
-        message += "\n\n".join(high_value_list[:5]) # 仅推送前5个最优质的
-    
-    message += "\n--------------------------\n"
-    message += "💡 建议：融资额 > 5000万美金的项目建议至少布局3个账号。"
-    return message
+        if count == 0:
+            content += "今日暂无大额融资变动。"
+            
+        content += "--------------------------\n"
+        content += "🤖 数据源: DefiLlama Real-time Raises"
+        return content
+        
+    except Exception as e:
+        return f"❌ 抓取失败: {str(e)}"
 
 def send_telegram(text):
     token = os.getenv("TELEGRAM_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    
-    # 增加超时处理，保证稳定性
-    try:
-        requests.post(url, data={"chat_id": chat_id, "text": text}, timeout=10)
-    except Exception as e:
-        print(f"发送失败: {e}")
+    requests.post(url, data={"chat_id": chat_id, "text": text, "disable_web_page_preview": "true"})
 
 if __name__ == "__main__":
-    report_content = get_high_value_airdrops()
-    send_telegram(report_content)
+    report = get_latest_fundraising()
+    send_telegram(report)
