@@ -1,60 +1,64 @@
 import requests
 import os
+import google.generativeai as genai
+import xml.etree.ElementTree as ET
 
-def get_crypto_trends():
-    # 使用 CoinGecko API 抓取当前热门项目（Trending）
-    # 这个 API 极度稳定，不会封禁 GitHub IP
-    url = "https://api.coingecko.com/api/v3/search/trending"
+def get_x_expert_updates(screen_name):
+    # 使用公开的 RSSHub 实例监听 X 账号 (无需 API Key)
+    rss_url = f"https://rsshub.app/twitter/user/{screen_name}"
     headers = {"User-Agent": "Mozilla/5.0"}
     
     try:
-        print("正在获取热门潜力项目...")
-        response = requests.get(url, headers=headers, timeout=20)
-        data = response.json()
-        coins = data.get('coins', [])
+        response = requests.get(rss_url, headers=headers, timeout=20)
+        root = ET.fromstring(response.content)
+        updates = []
         
-        if not coins:
-            return "⚠️ 今日暂无热门变动数据。"
-
-        message = "🌟 **今日全网热门潜力项目 (Trending)**\n"
-        message += "--------------------------\n"
-        message += "以下项目在过去24小时内搜索热度最高，建议关注其空投交互机会：\n\n"
+        # 抓取最新的 3 条推文内容
+        for item in root.findall('./channel/item')[:3]:
+            title = item.find('title').text
+            description = item.find('description').text
+            updates.append(f"推文内容: {title}\n详情: {description}")
         
-        for p in coins[:6]: # 抓取前6个
-            item = p.get('item', {})
-            name = item.get('name', '未知')
-            symbol = item.get('symbol', 'N/A')
-            rank = item.get('market_cap_rank', '未入榜')
-            
-            message += f"🔹 **项目:** {name} ({symbol})\n"
-            message += f"📊 **市值排名:** {rank}\n"
-            message += f"🔗 [点击研究](https://www.google.com/search?q={name}+crypto+airdrop+guide)\n\n"
-            
-        message += "--------------------------\n"
-        message += "💡 技巧：Trending 列表通常是空投发币前的预热信号。"
-        return message
-
+        return "\n".join(updates)
     except Exception as e:
-        print(f"抓取失败: {e}")
-        return "❌ 自动化抓取暂时受阻。请检查 GitHub Actions 网络环境。"
+        print(f"X 抓取失败: {e}")
+        return "无法获取推文动态"
 
-def send_telegram(text):
-    token = os.getenv("TELEGRAM_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+def get_ai_analysis(market_data, x_data):
+    # 配置 Gemini
+    api_key = os.getenv("GEMINI_API_KEY")
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash') # 使用最新的 flash 模型速度更快
     
-    payload = {
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
-    }
+    prompt = f"""
+    你是一个顶级加密货币分析师。请结合以下两部分信息生成简报：
+    
+    1. 【今日融资/热门数据】：
+    {market_data}
+    
+    2. 【KOL @Benjieming1Q84 的最新动态】：
+    {x_data}
+    
+    要求：
+    - 总结本杰明最近在关注什么、推荐什么操作。
+    - 结合融资数据，给出 2-3 个优先级最高的空投任务建议。
+    - 使用简洁的中文，分条罗列。
+    """
     
     try:
-        requests.post(url, json=payload, timeout=10)
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        print(f"发送异常: {e}")
+        return f"AI 总结失败: {str(e)}"
+
+# ... (保留你之前的 get_crypto_trends 函数) ...
 
 if __name__ == "__main__":
-    content = get_crypto_trends()
-    send_telegram(content)
+    # 1. 抓取市场趋势
+    market_info = get_crypto_trends()
+    # 2. 抓取本杰明的推文
+    x_expert_info = get_x_expert_updates("Benjieming1Q84")
+    # 3. 让 AI 进行综合研判
+    final_briefing = get_ai_analysis(market_info, x_expert_info)
+    # 4. 发送到 Telegram
+    send_telegram(f"🛡️ **Gemini 深度情报 (含本杰明动态)**\n\n{final_briefing}")
