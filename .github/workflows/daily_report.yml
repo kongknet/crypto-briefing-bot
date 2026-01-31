@@ -2,30 +2,29 @@ name: Crypto Daily Briefing
 
 on:
   schedule:
-    # 每天北京时间上午 09:00 运行 (对应 UTC 时间 01:00)
     - cron: '0 1 * * *'
-  workflow_dispatch: # 允许你手动点击按钮随时发送
+  workflow_dispatch: 
 
 jobs:
   send_report:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch and Send Briefing
+      - name: Send Briefing
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_TOKEN }}
-          format: markdown
+          # 删掉了 format: markdown，直接发纯文本最稳
           message: |
-            📅 **数字货币行业简报 (2026-01-31)**
-            ---
-            🔥 **今日必看空投 (Airdrop):**
-            * **Monad**: 融资 2.25 亿美金，主网激励活动是当前最高权重，务必参与。
-            * **Berachain**: 2 月初将有代币动态，建议每日保持 bArtio 测试网交互。
-            * **Movement**: 关注其 L3 扩展计划的最新积分任务。
+            今日加密货币行业简报 (2026-01-31)
+            --------------------------
+            今日必看空投 (Airdrop):
+            1. Monad: 融资 2.25 亿美金，主网激励活动权重最高。
+            2. Berachain: 2 月初将有代币动态，建议保持测试网交互。
+            3. Movement: 关注 L3 扩展计划的最新积分任务。
 
-            📈 **市场分析:**
-            * BTC 在 $105,000 震荡，资金流向显示高性能 L1 板块正在蓄势。
-            * 建议关注链上 gas 费用较低的时段进行空投交互。
-            ---
-            *自动化简报由 GitHub Actions 驱动*
+            市场分析:
+            - BTC 在 105,000 美元震荡，资金向高性能 L1 流动。
+            - 建议关注链上 Gas 较低时段进行交互。
+            --------------------------
+            自动化简报由 GitHub Actions 驱动
